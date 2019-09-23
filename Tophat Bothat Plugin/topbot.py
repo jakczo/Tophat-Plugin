@@ -2,65 +2,139 @@
 
 from gimpfu import *
 from array import array
-import math
-# import numpy as np
 
-
-def python_topbot(img, layer):
-    #pdb.gim_image_undo_group_start(img)
-    target_layer = gimp.Layer(img, 'target-layer', layer.width, layer.height, layer.type, layer.opacity, layer.mode)
-    img.add_layer(target_layer, 0)
-    pdb.gimp_image_resize(img, img.width * 2, img.height * 2, 0, 0)
-    pdb.gimp_layer_resize_to_image_size(layer)
-    pdb.gimp_layer_resize_to_image_size(target_layer)
+def python_topbot(image, layer):
+    greyscale_layer = gimp.Layer(image, '1Greyscale', layer.width, layer.height, layer.type, layer.opacity, layer.mode)
+    dilatation_layer = gimp.Layer(image, '2Dilatation', layer.width, layer.height, layer.type, layer.opacity, layer.mode)
+    erosion_layer = gimp.Layer(image, '3Erosion', layer.width, layer.height, layer.type, layer.opacity, layer.mode)
+    tophat_layer = gimp.Layer(image, '4Tophat', layer.width, layer.height, layer.type, layer.opacity, layer.mode)
+    image.add_layer(greyscale_layer, 0)
+    image.add_layer(dilatation_layer, 0)
+    image.add_layer(erosion_layer, 0)
+    image.add_layer(tophat_layer, 0)
 
     source_width = layer.width
     source_height = layer.height
     source_region = layer.get_pixel_rgn(0, 0, source_width, source_height, False, False)
     bytes_pp = source_region.bpp
-    target_region = target_layer.get_pixel_rgn(0, 0, source_width, source_height, True, True)
-    source_pixels = array("B", source_region[0:source_width, 0:source_height])
-    target_pixels = array("B", "\x00" * (source_width * source_height * bytes_pp))
+    source_pixels = array('B', source_region[0:source_width, 0:source_height])
+    pdb.gimp_message("bytes_pp = " + str(bytes_pp))
 
-    for x in range(0, source_width / 2):
-        for y in range(0, source_height / 2):
-            src_pos = (source_width * y + x) * bytes_pp
+    greyscale_region = greyscale_layer.get_pixel_rgn(0, 0, source_width, source_height, True, True)
+    dilatation_region = dilatation_layer.get_pixel_rgn(0, 0, source_width, source_height, True, True)
+    erosion_region = erosion_layer.get_pixel_rgn(0, 0, source_width, source_height, True, True)
+    tophat_region = tophat_layer.get_pixel_rgn(0, 0, source_width, source_height, True, True)
+
+    greyscale_pixels = array('B', "\x00" * (source_width * source_height * bytes_pp))
+    dilatation_pixels = array('B', "\x00" * (source_width * source_height * bytes_pp))
+    erosion_pixels = array('B', "\x00" * (source_width * source_height * bytes_pp))
+    tophat_pixels = array('B', "\x00" * (source_width * source_height * bytes_pp))
+
+#   calculating greyscale_pixels
+    for x in range(0, source_width):
+        for y in range(0, source_height):
+            src_pos = (x + source_width * y) * bytes_pp
             pixel = source_pixels[src_pos: src_pos + bytes_pp]
+            pixel_copy = pixel[:]
+
+            pixel[0] = int(pixel_copy[0] * 0.3 + pixel_copy[1] * 0.59 + pixel_copy[2] * 0.11)
+            pixel[1] = int(pixel_copy[0] * 0.3 + pixel_copy[1] * 0.59 + pixel_copy[2] * 0.11)
+            pixel[2] = int(pixel_copy[0] * 0.3 + pixel_copy[1] * 0.59 + pixel_copy[2] * 0.11)
+
+            pdb.gimp_message("( " + str(x) + ", " + str(y) + "): (R, G, B) = ("
+                             + str(pixel_copy[0]) + ", " + str(pixel_copy[1]) + ", " + str(pixel_copy[2]) + ")\nGrey = ("
+                             + str(pixel[0]) + ", " + str(pixel[1]) + ", " + str(pixel[2])
+                             + ")\nstr_pos = " + str(src_pos) + "\n")
+
+            greyscale_pixels[src_pos: src_pos + bytes_pp] = array('B', pixel)
+
+# calculating dilatation_pixels with element: 1 |1| 1
+    i = 0
+    for y in range(0, source_height):
+        for x in range(0, source_width):
+            grey_pos = i * bytes_pp
+
+            # not checking the x-1 pixel
+            if x == 0:
+                pixel = greyscale_pixels[grey_pos: grey_pos + bytes_pp * 2]
+                pixel_copy = pixel[:]
+                pixel[0] = max(pixel_copy)
+                pixel[1] = max(pixel_copy)
+                pixel[2] = max(pixel_copy)
+                dilatation_pixels[grey_pos: grey_pos + bytes_pp] = array('B', pixel[0: 3])
+
+            # not checking the x+1 pixel
+            elif x == source_width - 1:
+                pixel = greyscale_pixels[grey_pos - bytes_pp: grey_pos + bytes_pp]
+                pixel_copy = pixel[:]
+                pixel[3] = max(pixel_copy)
+                pixel[4] = max(pixel_copy)
+                pixel[5] = max(pixel_copy)
+                dilatation_pixels[grey_pos: grey_pos + bytes_pp] = array('B', pixel[3: 6])
+
+            # check the x-1, x and x+1 position
+            else:
+                pixel = greyscale_pixels[grey_pos - bytes_pp: grey_pos + bytes_pp * 2]
+                pixel_copy = pixel[:]
+                pixel[3] = max(pixel_copy)
+                pixel[4] = max(pixel_copy)
+                pixel[5] = max(pixel_copy)
+                dilatation_pixels[grey_pos: grey_pos + bytes_pp] = array('B', pixel[3: 6])
+
+            i = i + 1
+
+# calculating erosion_pixels with element: 1 |1| 1
+    i = 0
+    for y in range(0, source_height):
+        for x in range(0, source_width):
+            dilate_pos = i * bytes_pp
+
+            # not checking the x-1 pixel
+            if x == 0:
+                pixel = dilatation_pixels[dilate_pos: dilate_pos + bytes_pp * 2]
+                pixel_copy = pixel[:]
+                pixel[0] = min(pixel_copy)
+                pixel[1] = min(pixel_copy)
+                pixel[2] = min(pixel_copy)
+                erosion_pixels[dilate_pos: dilate_pos + bytes_pp] = array('B', pixel[0: 3])
+
+            # not checking the x+1 pixel
+            elif x == source_width - 1:
+                pixel = dilatation_pixels[dilate_pos - bytes_pp: dilate_pos + bytes_pp]
+                pixel_copy = pixel[:]
+                pixel[3] = min(pixel_copy)
+                pixel[4] = min(pixel_copy)
+                pixel[5] = min(pixel_copy)
+                erosion_pixels[dilate_pos: dilate_pos + bytes_pp] = array('B', pixel[3: 6])
+
+            # check the x-1, x and x+1 position
+            else:
+                pixel = dilatation_pixels[dilate_pos - bytes_pp: dilate_pos + bytes_pp * 2]
+                pixel_copy = pixel[:]
+                pixel[3] = min(pixel_copy)
+                pixel[4] = min(pixel_copy)
+                pixel[5] = min(pixel_copy)
+                erosion_pixels[dilate_pos: dilate_pos + bytes_pp] = array('B', pixel[3: 6])
+
+            i = i + 1
 
 
-            # temp = pixel[0]
-            # pixel[0] = pixel[2]
-            # pixel[2] = temp
-            #			pixel[3] sets transparency if image has alpha channel
+    greyscale_region[0:source_width, 0:source_height] = greyscale_pixels.tostring()
+    greyscale_layer.flush()
+    greyscale_layer.merge_shadow(True)
+    greyscale_layer.update(0, 0, source_width, source_height)
 
-            dest_pos_1 = (source_width * y * 2 + x) * bytes_pp + x * bytes_pp
-            dest_pos_2 = (source_width * y * 2 + x) * bytes_pp + x * bytes_pp + bytes_pp
-            dest_pos_3 = (source_width * y * 2 + x) * bytes_pp + x * bytes_pp + source_width * bytes_pp
-            dest_pos_4 = (source_width * y * 2 + x) * bytes_pp + x * bytes_pp + source_width * bytes_pp + bytes_pp
+    dilatation_region[0:source_width, 0:source_height] = dilatation_pixels.tostring()
+    dilatation_layer.flush()
+    dilatation_layer.merge_shadow(True)
+    dilatation_layer.update(0, 0, source_width, source_height)
 
-            target_pixels[dest_pos_1: dest_pos_1 + bytes_pp] = array('B', pixel)
-            target_pixels[dest_pos_2: dest_pos_2 + bytes_pp] = array('B', pixel)
-            target_pixels[dest_pos_3: dest_pos_3 + bytes_pp] = array('B', pixel)
-            target_pixels[dest_pos_4: dest_pos_4 + bytes_pp] = array('B', pixel)
-
-    target_region[0:source_width, 0:source_height] = target_pixels.tostring()
-
-    target_layer.flush()
-    target_layer.merge_shadow(True)
-    target_layer.update(0, 0, source_width, source_height)
+    erosion_region[0:source_width, 0:source_height] = erosion_pixels.tostring()
+    erosion_layer.flush()
+    erosion_layer.merge_shadow(True)
+    erosion_layer.update(0, 0, source_width, source_height)
 
     return
-
-
-# def channelData(layer):
-#     w = layer.width
-#     h = layer.height
-#     #w, h = layer.width, layer.height
-#     region = layer.get_pixel_rgn(0, 0, w, h)
-#     pixChars = region[:, :]
-#     bpp = region.bpp
-#     return np.frombuffer(pixChars, dtype = np.uint8).reshape(w,h,bpp)
-
 
 # register(
 # name of the plugin,
@@ -79,12 +153,11 @@ def python_topbot(img, layer):
 register(
     "python_fu_topbot",
     "Top-hat and bot-hat operations",
-    "Uses morphological operations such as top-hat and bot-hat to manipulate picture converted to monochromatic type "
-    "- grey scale",
+    "Uses morphological operations to manipulate picture converted to grey scale",
     "Jakub Czachor",
     "Jakub Czachor",
     "2019",
-    "<Image>/Filters/Generic/Top-hat, bot-hat..."
+    "<Image>/Test/top bot...",
     "RGB*",
     [],
     [],
