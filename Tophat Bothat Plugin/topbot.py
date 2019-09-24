@@ -4,14 +4,16 @@ from gimpfu import *
 from array import array
 
 def python_topbot(image, layer):
-    greyscale_layer = gimp.Layer(image, '1Greyscale', layer.width, layer.height, layer.type, layer.opacity, layer.mode)
-    dilatation_layer = gimp.Layer(image, '2Dilatation', layer.width, layer.height, layer.type, layer.opacity, layer.mode)
-    erosion_layer = gimp.Layer(image, '3Erosion', layer.width, layer.height, layer.type, layer.opacity, layer.mode)
-    tophat_layer = gimp.Layer(image, '4Tophat', layer.width, layer.height, layer.type, layer.opacity, layer.mode)
+    greyscale_layer = gimp.Layer(image, '1. Greyscale', layer.width, layer.height, layer.type, layer.opacity, layer.mode)
+    dilatation_layer = gimp.Layer(image, '2. Dilatation', layer.width, layer.height, layer.type, layer.opacity, layer.mode)
+    erosion_layer = gimp.Layer(image, '3. Erosion', layer.width, layer.height, layer.type, layer.opacity, layer.mode)
+    tophat_color_layer = gimp.Layer(image, '4. Tophat in color', layer.width, layer.height, layer.type, layer.opacity, layer.mode)
+    tophat_grey_layer = gimp.Layer(image, '5. Tophat in greyscale', layer.width, layer.height, layer.type, layer.opacity, layer.mode)
     image.add_layer(greyscale_layer, 0)
     image.add_layer(dilatation_layer, 0)
     image.add_layer(erosion_layer, 0)
-    image.add_layer(tophat_layer, 0)
+    image.add_layer(tophat_color_layer, 0)
+    image.add_layer(tophat_grey_layer, 0)
 
     source_width = layer.width
     source_height = layer.height
@@ -23,12 +25,14 @@ def python_topbot(image, layer):
     greyscale_region = greyscale_layer.get_pixel_rgn(0, 0, source_width, source_height, True, True)
     dilatation_region = dilatation_layer.get_pixel_rgn(0, 0, source_width, source_height, True, True)
     erosion_region = erosion_layer.get_pixel_rgn(0, 0, source_width, source_height, True, True)
-    tophat_region = tophat_layer.get_pixel_rgn(0, 0, source_width, source_height, True, True)
+    tophat_color_region = tophat_color_layer.get_pixel_rgn(0, 0, source_width, source_height, True, True)
+    tophat_grey_region = tophat_grey_layer.get_pixel_rgn(0, 0, source_width, source_height, True, True)
 
     greyscale_pixels = array('B', "\x00" * (source_width * source_height * bytes_pp))
     dilatation_pixels = array('B', "\x00" * (source_width * source_height * bytes_pp))
     erosion_pixels = array('B', "\x00" * (source_width * source_height * bytes_pp))
-    tophat_pixels = array('B', "\x00" * (source_width * source_height * bytes_pp))
+    tophat_color_pixels = array('B', "\x00" * (source_width * source_height * bytes_pp))
+    tophat_grey_pixels = array('B', "\x00" * (source_width * source_height * bytes_pp))
 
 #   calculating greyscale_pixels
     for x in range(0, source_width):
@@ -118,19 +122,33 @@ def python_topbot(image, layer):
 
             i = i + 1
 
-#   calculating tophat_pixels
+#   calculating tophat_color_pixels using original photo
     for x in range(0, source_width):
         for y in range(0, source_height):
-            tophat_pos = (x + source_width * y) * bytes_pp
-            pixel_source = source_pixels[tophat_pos: tophat_pos + bytes_pp]
+            tophat_color_pos = (x + source_width * y) * bytes_pp
+            pixel_source = source_pixels[tophat_color_pos: tophat_color_pos + bytes_pp]
             pixel = pixel_source[:]
-            pixel_erode = erosion_pixels[tophat_pos: tophat_pos + bytes_pp]
+            pixel_erode = erosion_pixels[tophat_color_pos: tophat_color_pos + bytes_pp]
             # pixel_erode_copy = pixel_erode[:]
 
             for k in range(0, bytes_pp):
                 pixel[k] = abs(pixel_erode[k] - pixel_source[k])
 
-            tophat_pixels[tophat_pos: tophat_pos + bytes_pp] = array('B', pixel)
+            tophat_color_pixels[tophat_color_pos: tophat_color_pos + bytes_pp] = array('B', pixel)
+
+#   calculating tophat_grey_pixels using grey photo
+    for x in range(0, source_width):
+        for y in range(0, source_height):
+            tophat_grey_pos = (x + source_width * y) * bytes_pp
+            pixel_greyscale = greyscale_pixels[tophat_grey_pos: tophat_grey_pos + bytes_pp]
+            pixel = pixel_greyscale[:]
+            pixel_erode = erosion_pixels[tophat_grey_pos: tophat_grey_pos + bytes_pp]
+            # pixel_erode_copy = pixel_erode[:]
+
+            for k in range(0, bytes_pp):
+                pixel[k] = abs(pixel_erode[k] - pixel_greyscale[k])
+
+            tophat_grey_pixels[tophat_grey_pos: tophat_grey_pos + bytes_pp] = array('B', pixel)
 
     greyscale_region[0:source_width, 0:source_height] = greyscale_pixels.tostring()
     greyscale_layer.flush()
@@ -147,10 +165,15 @@ def python_topbot(image, layer):
     erosion_layer.merge_shadow(True)
     erosion_layer.update(0, 0, source_width, source_height)
 
-    tophat_region[0:source_width, 0:source_height] = tophat_pixels.tostring()
-    tophat_layer.flush()
-    tophat_layer.merge_shadow(True)
-    tophat_layer.update(0, 0, source_width, source_height)
+    tophat_color_region[0:source_width, 0:source_height] = tophat_color_pixels.tostring()
+    tophat_color_layer.flush()
+    tophat_color_layer.merge_shadow(True)
+    tophat_color_layer.update(0, 0, source_width, source_height)
+
+    tophat_grey_region[0:source_width, 0:source_height] = tophat_color_pixels.tostring()
+    tophat_grey_layer.flush()
+    tophat_grey_layer.merge_shadow(True)
+    tophat_grey_layer.update(0, 0, source_width, source_height)
 
     return
 
