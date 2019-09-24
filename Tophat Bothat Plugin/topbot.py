@@ -118,6 +118,19 @@ def python_topbot(image, layer):
 
             i = i + 1
 
+#   calculating tophat_pixels
+    for x in range(0, source_width):
+        for y in range(0, source_height):
+            tophat_pos = (x + source_width * y) * bytes_pp
+            pixel_source = source_pixels[tophat_pos: tophat_pos + bytes_pp]
+            pixel = pixel_source[:]
+            pixel_erode = erosion_pixels[tophat_pos: tophat_pos + bytes_pp]
+            # pixel_erode_copy = pixel_erode[:]
+
+            for k in range(0, bytes_pp):
+                pixel[k] = abs(pixel_erode[k] - pixel_source[k])
+
+            tophat_pixels[tophat_pos: tophat_pos + bytes_pp] = array('B', pixel)
 
     greyscale_region[0:source_width, 0:source_height] = greyscale_pixels.tostring()
     greyscale_layer.flush()
@@ -133,6 +146,11 @@ def python_topbot(image, layer):
     erosion_layer.flush()
     erosion_layer.merge_shadow(True)
     erosion_layer.update(0, 0, source_width, source_height)
+
+    tophat_region[0:source_width, 0:source_height] = tophat_pixels.tostring()
+    tophat_layer.flush()
+    tophat_layer.merge_shadow(True)
+    tophat_layer.update(0, 0, source_width, source_height)
 
     return
 
