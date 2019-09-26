@@ -3,7 +3,7 @@
 from gimpfu import *
 from array import array
 
-def python_topbot_square(image, layer):
+def python_white_tophat(image, layer):
     width = layer.width
     height = layer.height
     source_region = layer.get_pixel_rgn(0, 0, width, height, False, False)
@@ -11,8 +11,7 @@ def python_topbot_square(image, layer):
     source_pixels = array('B', source_region[0:width, 0:height])
     pdb.gimp_message("bytes_pp = " + str(bytes_pp))
 
-#   Black Top-Hat transform (using close morphological operator)
-    black_tophat(image, layer, bytes_pp, source_pixels)
+#   White Top-Hat transform (using close morphological operator)
     white_tophat(image, layer, bytes_pp, source_pixels)
     return
 
@@ -36,11 +35,11 @@ def convert_to_greyscale(img, lay, bytes_per_pixel, input_pixel_list):
             pixel[1] = int(pixel_copy[0] * 0.3 + pixel_copy[1] * 0.59 + pixel_copy[2] * 0.11)
             pixel[2] = int(pixel_copy[0] * 0.3 + pixel_copy[1] * 0.59 + pixel_copy[2] * 0.11)
 
-            pdb.gimp_message("( " + str(x) + ", " + str(y) + "): (R, G, B) = ("
-                             + str(pixel_copy[0]) + ", " + str(pixel_copy[1]) + ", " + str(
-                pixel_copy[2]) + ")\nGrey = ("
-                             + str(pixel[0]) + ", " + str(pixel[1]) + ", " + str(pixel[2])
-                             + ")\nstr_pos = " + str(src_pos) + "\n")
+            # pdb.gimp_message("( " + str(x) + ", " + str(y) + "): (R, G, B) = ("
+            #                  + str(pixel_copy[0]) + ", " + str(pixel_copy[1]) + ", " + str(
+            #     pixel_copy[2]) + ")\nGrey = ("
+            #                  + str(pixel[0]) + ", " + str(pixel[1]) + ", " + str(pixel[2])
+            #                  + ")\nstr_pos = " + str(src_pos) + "\n")
 
             greyscale_pixels_list[src_pos: src_pos + bytes_per_pixel] = array('B', pixel)
 
@@ -309,40 +308,6 @@ def erode(img, lay, bytes_per_pixel, input_pixel_list):
 
     return erosion_pixels_list
 
-
-#   Black Top-Hat transform
-def black_tophat(img, lay, bytes_per_pixel, input_pixels):
-    greyscale_pixels = convert_to_greyscale(img, lay, bytes_per_pixel, input_pixels)
-    dilatation_pixels = dilate(img, lay, bytes_per_pixel, greyscale_pixels)
-    erosion_pixels = erode(img, lay, bytes_per_pixel, dilatation_pixels)
-
-    black_tophat_layer = gimp.Layer(img, 'Black Tophat', lay.width, lay.height, lay.type, lay.opacity, lay.mode)
-    img.add_layer(black_tophat_layer, 0)
-    width = black_tophat_layer.width
-    height = black_tophat_layer.height
-    black_tophat_region = black_tophat_layer.get_pixel_rgn(0, 0, width, height, True, True)
-    black_tophat_pixels_list = array('B', "\x00" * (width * height * bytes_per_pixel))
-
-    for x in range(0, width):
-        for y in range(0, height):
-            tophat_pos = (x + width * y) * bytes_per_pixel
-            pixel_greyscale = greyscale_pixels[tophat_pos: tophat_pos + bytes_per_pixel]
-            pixel = pixel_greyscale[:]
-            pixel_erode = erosion_pixels[tophat_pos: tophat_pos + bytes_per_pixel]
-
-            for k in range(0, bytes_per_pixel):
-                pixel[k] = abs(pixel_erode[k] - pixel_greyscale[k])
-
-            black_tophat_pixels_list[tophat_pos: tophat_pos + bytes_per_pixel] = array('B', pixel)
-
-    black_tophat_region[0:width, 0:height] = black_tophat_pixels_list.tostring()
-    black_tophat_layer.flush()
-    black_tophat_layer.merge_shadow(True)
-    black_tophat_layer.update(0, 0, width, height)
-
-    return
-
-
 #   White Top-Hat transform
 def white_tophat(img, lay, bytes_per_pixel, input_pixels):
     greyscale_pixels = convert_to_greyscale(img, lay, bytes_per_pixel, input_pixels)
@@ -390,16 +355,16 @@ def white_tophat(img, lay, bytes_per_pixel, input_pixels):
 
 
 register(
-    "python_fu_topbot",
-    "Top-hat and bot-hat operations",
+    "python_fu_white_tophat",
+    "White Top-Hat transform",
     "Uses morphological operations to manipulate picture converted to grey scale",
     "Jakub Czachor",
     "Jakub Czachor",
     "2019",
-    "<Image>/Test/top...",
+    "<Image>/Filters/Top-Hat/White Top-Hat",
     "RGB*",
     [],
     [],
-    python_topbot_square)
+    python_white_tophat)
 
 main()

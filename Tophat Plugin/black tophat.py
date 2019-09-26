@@ -3,7 +3,7 @@
 from gimpfu import *
 from array import array
 
-def python_topbot_cross(image, layer):
+def python_black_tophat(image, layer):
     width = layer.width
     height = layer.height
     source_region = layer.get_pixel_rgn(0, 0, width, height, False, False)
@@ -13,7 +13,6 @@ def python_topbot_cross(image, layer):
 
 #   Black Top-Hat transform (using close morphological operator)
     black_tophat(image, layer, bytes_pp, source_pixels)
-    white_tophat(image, layer, bytes_pp, source_pixels)
     return
 
 
@@ -35,6 +34,12 @@ def convert_to_greyscale(img, lay, bytes_per_pixel, input_pixel_list):
             pixel[0] = int(pixel_copy[0] * 0.3 + pixel_copy[1] * 0.59 + pixel_copy[2] * 0.11)
             pixel[1] = int(pixel_copy[0] * 0.3 + pixel_copy[1] * 0.59 + pixel_copy[2] * 0.11)
             pixel[2] = int(pixel_copy[0] * 0.3 + pixel_copy[1] * 0.59 + pixel_copy[2] * 0.11)
+
+            # pdb.gimp_message("( " + str(x) + ", " + str(y) + "): (R, G, B) = ("
+            #                  + str(pixel_copy[0]) + ", " + str(pixel_copy[1]) + ", " + str(
+            #     pixel_copy[2]) + ")\nGrey = ("
+            #                  + str(pixel[0]) + ", " + str(pixel[1]) + ", " + str(pixel[2])
+            #                  + ")\nstr_pos = " + str(src_pos) + "\n")
 
             greyscale_pixels_list[src_pos: src_pos + bytes_per_pixel] = array('B', pixel)
 
@@ -60,106 +65,107 @@ def dilate(img, lay, bytes_per_pixel, input_pixel_list):
 
             if x == 0:
 
-                # check the (x,y), (x+1, y) and (x, y+1) pixels
+                # check the (x,y), (x+1, y) and (x, y+1) and additional (x+1, y+1) pixels
                 if y == 0:
                     chosen_pixels = input_pixel_list[position_by_x: position_by_x + bytes_per_pixel * 2]
                     position_by_y = (x + (y + 1) * width) * bytes_per_pixel
-                    chosen_pixels.extend(input_pixel_list[position_by_y: position_by_y + bytes_per_pixel])
+                    chosen_pixels.extend(input_pixel_list[position_by_y: position_by_y + bytes_per_pixel* 2])
                     chosen_pixels_copy = chosen_pixels[:]
                     chosen_pixels_copy[0] = max(chosen_pixels)
                     chosen_pixels_copy[1] = max(chosen_pixels)
                     chosen_pixels_copy[2] = max(chosen_pixels)
                     dilatation_pixels_list[position_by_x: position_by_x + bytes_per_pixel] = array('B', chosen_pixels_copy[0: 3])
 
-                # check the (x,y), (x+1, y) and (x, y-1) pixels
+                # check the (x,y), (x+1, y) and (x, y-1) and additional (x+1, y-1) pixels
                 elif y == height - 1:
                     chosen_pixels = input_pixel_list[position_by_x: position_by_x + bytes_per_pixel * 2]
                     position_by_y = (x + (y - 1) * width) * bytes_per_pixel
-                    chosen_pixels.extend(input_pixel_list[position_by_y: position_by_y + bytes_per_pixel])
+                    chosen_pixels.extend(input_pixel_list[position_by_y: position_by_y + bytes_per_pixel * 2])
                     chosen_pixels_copy = chosen_pixels[:]
                     chosen_pixels_copy[0] = max(chosen_pixels)
                     chosen_pixels_copy[1] = max(chosen_pixels)
                     chosen_pixels_copy[2] = max(chosen_pixels)
                     dilatation_pixels_list[position_by_x: position_by_x + bytes_per_pixel] = array('B', chosen_pixels_copy[0: 3])
 
-                # checking the (x,y), (x+1, y), (x, y-1) and (x, y+1) pixels
+                # checking the (x,y), (x+1, y), (x, y-1) and (x, y+1) and additional (x+1, y-1) and (x+1, y+1) pixels
                 else:
                     chosen_pixels = input_pixel_list[position_by_x: position_by_x + bytes_per_pixel * 2]
                     position_by_y = (x + (y - 1) * width) * bytes_per_pixel
-                    chosen_pixels.extend(input_pixel_list[position_by_y: position_by_y + bytes_per_pixel])
+                    chosen_pixels.extend(input_pixel_list[position_by_y: position_by_y + bytes_per_pixel * 2])
                     position_by_y = (x + (y + 1) * width) * bytes_per_pixel
-                    chosen_pixels.extend(input_pixel_list[position_by_y: position_by_y + bytes_per_pixel])
+                    chosen_pixels.extend(input_pixel_list[position_by_y: position_by_y + bytes_per_pixel * 2])
                     chosen_pixels_copy = chosen_pixels[:]
                     chosen_pixels_copy[0] = max(chosen_pixels)
                     chosen_pixels_copy[1] = max(chosen_pixels)
                     chosen_pixels_copy[2] = max(chosen_pixels)
                     dilatation_pixels_list[position_by_x: position_by_x + bytes_per_pixel] = array('B', chosen_pixels_copy[0: 3])
 
-            # check the (x,y), (x-1, y) and (x, y+1) pixels
             elif x == width - 1:
+
+                # check the (x,y), (x-1, y) and (x, y+1) and additional (x-1, y+1) pixels
                 if y == 0:
                     chosen_pixels = input_pixel_list[position_by_x - bytes_per_pixel: position_by_x + bytes_per_pixel]
                     position_by_y = (x + (y + 1) * width) * bytes_per_pixel
-                    chosen_pixels.extend(input_pixel_list[position_by_y: position_by_y + bytes_per_pixel])
+                    chosen_pixels.extend(input_pixel_list[position_by_y - bytes_per_pixel: position_by_y + bytes_per_pixel])
                     chosen_pixels_copy = chosen_pixels[:]
                     chosen_pixels_copy[0] = max(chosen_pixels)
                     chosen_pixels_copy[1] = max(chosen_pixels)
                     chosen_pixels_copy[2] = max(chosen_pixels)
                     dilatation_pixels_list[position_by_x: position_by_x + bytes_per_pixel] = array('B', chosen_pixels_copy[0: 3])
 
-                # check the (x,y), (x-1, y) and (x, y-1) pixels
+                # check the (x,y), (x-1, y) and (x, y-1) and additional (x-1, y-1) pixels
                 elif y == height - 1:
                     chosen_pixels = input_pixel_list[position_by_x - bytes_per_pixel: position_by_x + bytes_per_pixel]
                     position_by_y = (x + (y - 1) * width) * bytes_per_pixel
-                    chosen_pixels.extend(input_pixel_list[position_by_y: position_by_y + bytes_per_pixel])
+                    chosen_pixels.extend(input_pixel_list[position_by_y - bytes_per_pixel: position_by_y + bytes_per_pixel])
                     chosen_pixels_copy = chosen_pixels[:]
                     chosen_pixels_copy[0] = max(chosen_pixels)
                     chosen_pixels_copy[1] = max(chosen_pixels)
                     chosen_pixels_copy[2] = max(chosen_pixels)
                     dilatation_pixels_list[position_by_x: position_by_x + bytes_per_pixel] = array('B', chosen_pixels_copy[0: 3])
 
-                # check the (x,y), (x-1, y), (x, y-1) and (x, y+1) pixels
+                # check the (x,y), (x-1, y), (x, y-1) and (x, y+1) and additional (x-1, y-1) and (x-1, y+1) pixels
                 else:
                     chosen_pixels = input_pixel_list[position_by_x - bytes_per_pixel: position_by_x + bytes_per_pixel]
                     position_by_y = (x + (y - 1) * width) * bytes_per_pixel
-                    chosen_pixels.extend(input_pixel_list[position_by_y: position_by_y + bytes_per_pixel])
+                    chosen_pixels.extend(input_pixel_list[position_by_y - bytes_per_pixel: position_by_y + bytes_per_pixel])
                     position_by_y = (x + (y + 1) * width) * bytes_per_pixel
-                    chosen_pixels.extend(input_pixel_list[position_by_y: position_by_y + bytes_per_pixel])
+                    chosen_pixels.extend(input_pixel_list[position_by_y - bytes_per_pixel: position_by_y + bytes_per_pixel])
                     chosen_pixels_copy = chosen_pixels[:]
                     chosen_pixels_copy[0] = max(chosen_pixels)
                     chosen_pixels_copy[1] = max(chosen_pixels)
                     chosen_pixels_copy[2] = max(chosen_pixels)
                     dilatation_pixels_list[position_by_x: position_by_x + bytes_per_pixel] = array('B', chosen_pixels_copy[0: 3])
 
-            # check the (x-1,y), (x, y), (x+1, y) and (x, y+1) pixels
+            # check the (x-1,y), (x, y), (x+1, y) and (x, y+1) and additional (x-1, y+1) and (x+1, y+1) pixels
             elif y == 0:
                 chosen_pixels = input_pixel_list[position_by_x - bytes_per_pixel: position_by_x + bytes_per_pixel * 2]
                 position_by_y = (x + (y + 1) * width) * bytes_per_pixel
-                chosen_pixels.extend(input_pixel_list[position_by_y: position_by_y + bytes_per_pixel])
+                chosen_pixels.extend(input_pixel_list[position_by_y - bytes_per_pixel: position_by_y + bytes_per_pixel * 2])
                 chosen_pixels_copy = chosen_pixels[:]
                 chosen_pixels_copy[0] = max(chosen_pixels)
                 chosen_pixels_copy[1] = max(chosen_pixels)
                 chosen_pixels_copy[2] = max(chosen_pixels)
                 dilatation_pixels_list[position_by_x: position_by_x + bytes_per_pixel] = array('B', chosen_pixels_copy[0: 3])
 
-            # check the (x-1,y), (x, y), (x+1, y) and (x, y-1) pixels
+            # check the (x-1,y), (x, y), (x+1, y) and (x, y-1) and additional (x-1, y-1) and (x+1, y-1) pixels
             elif y == height - 1:
                 chosen_pixels = input_pixel_list[position_by_x - bytes_per_pixel: position_by_x + bytes_per_pixel * 2]
                 position_by_y = (x + (y - 1) * width) * bytes_per_pixel
-                chosen_pixels.extend(input_pixel_list[position_by_y: position_by_y + bytes_per_pixel])
+                chosen_pixels.extend(input_pixel_list[position_by_y - bytes_per_pixel: position_by_y + bytes_per_pixel * 2])
                 chosen_pixels_copy = chosen_pixels[:]
                 chosen_pixels_copy[0] = max(chosen_pixels)
                 chosen_pixels_copy[1] = max(chosen_pixels)
                 chosen_pixels_copy[2] = max(chosen_pixels)
                 dilatation_pixels_list[position_by_x: position_by_x + bytes_per_pixel] = array('B', chosen_pixels_copy[0: 3])
 
-            # check the (x-1,y), (x, y), (x+1, y), (x, y-1) and (x, y+1) pixels
+            # check the (x-1,y), (x, y), (x+1, y), (x, y-1) and (x, y+1) and additional (x-1, y-1), (x+1, y-1), (x-1, y+1) and (x+1, y+1) pixels
             else:
                 chosen_pixels = input_pixel_list[position_by_x - bytes_per_pixel: position_by_x + bytes_per_pixel * 2]
                 position_by_y = (x + (y - 1) * width) * bytes_per_pixel
-                chosen_pixels.extend(input_pixel_list[position_by_y: position_by_y + bytes_per_pixel])
+                chosen_pixels.extend(input_pixel_list[position_by_y - bytes_per_pixel: position_by_y + bytes_per_pixel * 2])
                 position_by_y = (x + (y + 1) * width) * bytes_per_pixel
-                chosen_pixels.extend(input_pixel_list[position_by_y: position_by_y + bytes_per_pixel])
+                chosen_pixels.extend(input_pixel_list[position_by_y - bytes_per_pixel: position_by_y + bytes_per_pixel * 2])
                 chosen_pixels_copy = chosen_pixels[:]
                 chosen_pixels_copy[0] = max(chosen_pixels)
                 chosen_pixels_copy[1] = max(chosen_pixels)
@@ -188,106 +194,107 @@ def erode(img, lay, bytes_per_pixel, input_pixel_list):
 
             if x == 0:
 
-                # check the (x,y), (x+1, y) and (x, y+1) pixels
+                # check the (x,y), (x+1, y) and (x, y+1) and additional (x+1, y+1) pixels
                 if y == 0:
                     chosen_pixels = input_pixel_list[position_by_x: position_by_x + bytes_per_pixel * 2]
                     position_by_y = (x + (y + 1) * width) * bytes_per_pixel
-                    chosen_pixels.extend(input_pixel_list[position_by_y: position_by_y + bytes_per_pixel])
+                    chosen_pixels.extend(input_pixel_list[position_by_y: position_by_y + bytes_per_pixel* 2])
                     chosen_pixels_copy = chosen_pixels[:]
                     chosen_pixels_copy[0] = min(chosen_pixels)
                     chosen_pixels_copy[1] = min(chosen_pixels)
                     chosen_pixels_copy[2] = min(chosen_pixels)
                     erosion_pixels_list[position_by_x: position_by_x + bytes_per_pixel] = array('B', chosen_pixels_copy[0: 3])
 
-                # check the (x,y), (x+1, y) and (x, y-1) pixels
+                # check the (x,y), (x+1, y) and (x, y-1) and additional (x+1, y-1) pixels
                 elif y == height - 1:
                     chosen_pixels = input_pixel_list[position_by_x: position_by_x + bytes_per_pixel * 2]
                     position_by_y = (x + (y - 1) * width) * bytes_per_pixel
-                    chosen_pixels.extend(input_pixel_list[position_by_y: position_by_y + bytes_per_pixel])
+                    chosen_pixels.extend(input_pixel_list[position_by_y: position_by_y + bytes_per_pixel * 2])
                     chosen_pixels_copy = chosen_pixels[:]
                     chosen_pixels_copy[0] = min(chosen_pixels)
                     chosen_pixels_copy[1] = min(chosen_pixels)
                     chosen_pixels_copy[2] = min(chosen_pixels)
                     erosion_pixels_list[position_by_x: position_by_x + bytes_per_pixel] = array('B', chosen_pixels_copy[0: 3])
 
-                # checking the (x,y), (x+1, y), (x, y-1) and (x, y+1) pixels
+                # checking the (x,y), (x+1, y), (x, y-1) and (x, y+1) and additional (x+1, y-1) and (x+1, y+1) pixels
                 else:
                     chosen_pixels = input_pixel_list[position_by_x: position_by_x + bytes_per_pixel * 2]
                     position_by_y = (x + (y - 1) * width) * bytes_per_pixel
-                    chosen_pixels.extend(input_pixel_list[position_by_y: position_by_y + bytes_per_pixel])
+                    chosen_pixels.extend(input_pixel_list[position_by_y: position_by_y + bytes_per_pixel * 2])
                     position_by_y = (x + (y + 1) * width) * bytes_per_pixel
-                    chosen_pixels.extend(input_pixel_list[position_by_y: position_by_y + bytes_per_pixel])
+                    chosen_pixels.extend(input_pixel_list[position_by_y: position_by_y + bytes_per_pixel * 2])
                     chosen_pixels_copy = chosen_pixels[:]
                     chosen_pixels_copy[0] = min(chosen_pixels)
                     chosen_pixels_copy[1] = min(chosen_pixels)
                     chosen_pixels_copy[2] = min(chosen_pixels)
                     erosion_pixels_list[position_by_x: position_by_x + bytes_per_pixel] = array('B', chosen_pixels_copy[0: 3])
 
-            # check the (x,y), (x-1, y) and (x, y+1) pixels
             elif x == width - 1:
+
+                # check the (x,y), (x-1, y) and (x, y+1) and additional (x-1, y+1) pixels
                 if y == 0:
                     chosen_pixels = input_pixel_list[position_by_x - bytes_per_pixel: position_by_x + bytes_per_pixel]
                     position_by_y = (x + (y + 1) * width) * bytes_per_pixel
-                    chosen_pixels.extend(input_pixel_list[position_by_y: position_by_y + bytes_per_pixel])
+                    chosen_pixels.extend(input_pixel_list[position_by_y - bytes_per_pixel: position_by_y + bytes_per_pixel])
                     chosen_pixels_copy = chosen_pixels[:]
                     chosen_pixels_copy[0] = min(chosen_pixels)
                     chosen_pixels_copy[1] = min(chosen_pixels)
                     chosen_pixels_copy[2] = min(chosen_pixels)
                     erosion_pixels_list[position_by_x: position_by_x + bytes_per_pixel] = array('B', chosen_pixels_copy[0: 3])
 
-                # check the (x,y), (x-1, y) and (x, y-1) pixels
+                # check the (x,y), (x-1, y) and (x, y-1) and additional (x-1, y-1) pixels
                 elif y == height - 1:
                     chosen_pixels = input_pixel_list[position_by_x - bytes_per_pixel: position_by_x + bytes_per_pixel]
                     position_by_y = (x + (y - 1) * width) * bytes_per_pixel
-                    chosen_pixels.extend(input_pixel_list[position_by_y: position_by_y + bytes_per_pixel])
+                    chosen_pixels.extend(input_pixel_list[position_by_y - bytes_per_pixel: position_by_y + bytes_per_pixel])
                     chosen_pixels_copy = chosen_pixels[:]
                     chosen_pixels_copy[0] = min(chosen_pixels)
                     chosen_pixels_copy[1] = min(chosen_pixels)
                     chosen_pixels_copy[2] = min(chosen_pixels)
                     erosion_pixels_list[position_by_x: position_by_x + bytes_per_pixel] = array('B', chosen_pixels_copy[0: 3])
 
-                # check the (x,y), (x-1, y), (x, y-1) and (x, y+1) pixels
+                # check the (x,y), (x-1, y), (x, y-1) and (x, y+1) and additional (x-1, y-1) and (x-1, y+1) pixels
                 else:
                     chosen_pixels = input_pixel_list[position_by_x - bytes_per_pixel: position_by_x + bytes_per_pixel]
                     position_by_y = (x + (y - 1) * width) * bytes_per_pixel
-                    chosen_pixels.extend(input_pixel_list[position_by_y: position_by_y + bytes_per_pixel])
+                    chosen_pixels.extend(input_pixel_list[position_by_y - bytes_per_pixel: position_by_y + bytes_per_pixel])
                     position_by_y = (x + (y + 1) * width) * bytes_per_pixel
-                    chosen_pixels.extend(input_pixel_list[position_by_y: position_by_y + bytes_per_pixel])
+                    chosen_pixels.extend(input_pixel_list[position_by_y - bytes_per_pixel: position_by_y + bytes_per_pixel])
                     chosen_pixels_copy = chosen_pixels[:]
                     chosen_pixels_copy[0] = min(chosen_pixels)
                     chosen_pixels_copy[1] = min(chosen_pixels)
                     chosen_pixels_copy[2] = min(chosen_pixels)
                     erosion_pixels_list[position_by_x: position_by_x + bytes_per_pixel] = array('B', chosen_pixels_copy[0: 3])
 
-            # check the (x-1,y), (x, y), (x+1, y) and (x, y+1) pixels
+            # check the (x-1,y), (x, y), (x+1, y) and (x, y+1) and additional (x-1, y+1) and (x+1, y+1) pixels
             elif y == 0:
                 chosen_pixels = input_pixel_list[position_by_x - bytes_per_pixel: position_by_x + bytes_per_pixel * 2]
                 position_by_y = (x + (y + 1) * width) * bytes_per_pixel
-                chosen_pixels.extend(input_pixel_list[position_by_y: position_by_y + bytes_per_pixel])
+                chosen_pixels.extend(input_pixel_list[position_by_y - bytes_per_pixel: position_by_y + bytes_per_pixel * 2])
                 chosen_pixels_copy = chosen_pixels[:]
                 chosen_pixels_copy[0] = min(chosen_pixels)
                 chosen_pixels_copy[1] = min(chosen_pixels)
                 chosen_pixels_copy[2] = min(chosen_pixels)
                 erosion_pixels_list[position_by_x: position_by_x + bytes_per_pixel] = array('B', chosen_pixels_copy[0: 3])
 
-            # check the (x-1,y), (x, y), (x+1, y) and (x, y-1) pixels
+            # check the (x-1,y), (x, y), (x+1, y) and (x, y-1) and additional (x-1, y-1) and (x+1, y-1) pixels
             elif y == height - 1:
                 chosen_pixels = input_pixel_list[position_by_x - bytes_per_pixel: position_by_x + bytes_per_pixel * 2]
                 position_by_y = (x + (y - 1) * width) * bytes_per_pixel
-                chosen_pixels.extend(input_pixel_list[position_by_y: position_by_y + bytes_per_pixel])
+                chosen_pixels.extend(input_pixel_list[position_by_y - bytes_per_pixel: position_by_y + bytes_per_pixel * 2])
                 chosen_pixels_copy = chosen_pixels[:]
                 chosen_pixels_copy[0] = min(chosen_pixels)
                 chosen_pixels_copy[1] = min(chosen_pixels)
                 chosen_pixels_copy[2] = min(chosen_pixels)
                 erosion_pixels_list[position_by_x: position_by_x + bytes_per_pixel] = array('B', chosen_pixels_copy[0: 3])
 
-            # check the (x-1,y), (x, y), (x+1, y), (x, y-1) and (x, y+1) pixels
+            # check the (x-1,y), (x, y), (x+1, y), (x, y-1) and (x, y+1) and additional (x-1, y-1), (x+1, y-1), (x-1, y+1) and (x+1, y+1) pixels
             else:
                 chosen_pixels = input_pixel_list[position_by_x - bytes_per_pixel: position_by_x + bytes_per_pixel * 2]
                 position_by_y = (x + (y - 1) * width) * bytes_per_pixel
-                chosen_pixels.extend(input_pixel_list[position_by_y: position_by_y + bytes_per_pixel])
+                chosen_pixels.extend(input_pixel_list[position_by_y - bytes_per_pixel: position_by_y + bytes_per_pixel * 2])
                 position_by_y = (x + (y + 1) * width) * bytes_per_pixel
-                chosen_pixels.extend(input_pixel_list[position_by_y: position_by_y + bytes_per_pixel])
+                chosen_pixels.extend(input_pixel_list[position_by_y - bytes_per_pixel: position_by_y + bytes_per_pixel * 2])
                 chosen_pixels_copy = chosen_pixels[:]
                 chosen_pixels_copy[0] = min(chosen_pixels)
                 chosen_pixels_copy[1] = min(chosen_pixels)
@@ -334,39 +341,6 @@ def black_tophat(img, lay, bytes_per_pixel, input_pixels):
 
     return
 
-
-#   White Top-Hat transform
-def white_tophat(img, lay, bytes_per_pixel, input_pixels):
-    greyscale_pixels = convert_to_greyscale(img, lay, bytes_per_pixel, input_pixels)
-    erosion_pixels = erode(img, lay, bytes_per_pixel, greyscale_pixels)
-    dilatation_pixels = dilate(img, lay, bytes_per_pixel, erosion_pixels)
-
-    white_tophat_layer = gimp.Layer(img, 'White Tophat', lay.width, lay.height, lay.type, lay.opacity, lay.mode)
-    img.add_layer(white_tophat_layer, 0)
-    width = white_tophat_layer.width
-    height = white_tophat_layer.height
-    white_tophat_region = white_tophat_layer.get_pixel_rgn(0, 0, width, height, True, True)
-    white_tophat_pixels_list = array('B', "\x00" * (width * height * bytes_per_pixel))
-
-    for x in range(0, width):
-        for y in range(0, height):
-            tophat_pos = (x + width * y) * bytes_per_pixel
-            pixel_greyscale = greyscale_pixels[tophat_pos: tophat_pos + bytes_per_pixel]
-            pixel = pixel_greyscale[:]
-            pixel_dilate = dilatation_pixels[tophat_pos: tophat_pos + bytes_per_pixel]
-
-            for k in range(0, bytes_per_pixel):
-                pixel[k] = abs(pixel_greyscale[k] - pixel_dilate[k])
-
-            white_tophat_pixels_list[tophat_pos: tophat_pos + bytes_per_pixel] = array('B', pixel)
-
-    white_tophat_region[0:width, 0:height] = white_tophat_pixels_list.tostring()
-    white_tophat_layer.flush()
-    white_tophat_layer.merge_shadow(True)
-    white_tophat_layer.update(0, 0, width, height)
-
-    return
-
 # register(
 # name of the plugin,
 # brief description,
@@ -382,16 +356,16 @@ def white_tophat(img, lay, bytes_per_pixel, input_pixels):
 
 
 register(
-    "python_fu_topbot",
-    "Top-hat and bot-hat operations",
+    "python_fu_black_tophat",
+    "Black Top-Hat transform",
     "Uses morphological operations to manipulate picture converted to grey scale",
     "Jakub Czachor",
     "Jakub Czachor",
     "2019",
-    "<Image>/Test/top bot...",
+    "<Image>/Filters/Top-Hat/Black Top-Hat",
     "RGB*",
     [],
     [],
-    python_topbot_cross)
+    python_black_tophat)
 
 main()
